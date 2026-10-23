@@ -2,9 +2,19 @@
 
 Camera integration by **[byfuse3d.com](https://byfuse3d.com/)**.
 
+[![Add repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fbyfuse3d%2Fformlabs-fuse-camera)
+
+The button opens Home Assistant with this app repository prefilled. Confirm adding the repository, then install **Formlabs Fuse Camera by byfuse3d.com**. Home Assistant OS is required for the app store.
+
 Local camera streaming for Formlabs Fuse 1 and Fuse 1+ 30W printers, with a Home Assistant app and standalone viewers.
 
 The recommended relay connects directly to the printer's camera WebSocket and serves MJPEG video and JPEG snapshots. It runs on Home Assistant OS, in Docker, or with Python 3.10+. The runtime uses only the Python standard library.
+
+## Camera preview
+
+![Fuse 1+ camera feed in Home Assistant](docs/images/fuse-camera-preview.jpg)
+
+Actual Fuse 1+ camera feed shown in Home Assistant, cropped to remove the phone interface.
 
 ## Home Assistant
 
@@ -60,6 +70,6 @@ Tests use a simulated camera on loopback and require no real printer.
 
 ## Privacy and access
 
-Personal network addresses, deployment records, captured camera images, machine paths, and credentials are excluded. The bind address `0.0.0.0` and test loopback address `127.0.0.1` are generic networking constants. Set personal values locally in Home Assistant options, environment variables, or an ignored `.env` file.
+Personal network addresses, deployment records, machine paths, and credentials are excluded. The camera preview above is a shared, cropped screenshot; other camera captures are excluded. The bind address `0.0.0.0` and test loopback address `127.0.0.1` are generic networking constants. Set personal values locally in Home Assistant options, environment variables, or an ignored `.env` file.
 
 The relay and observed printer camera endpoint have no built-in authentication. Keep them on a trusted network. This is an independent implementation, unaffiliated with Formlabs. No vendor binaries or decompiled implementation are included.

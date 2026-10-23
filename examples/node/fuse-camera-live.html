@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fuse 1+ live camera</title>
+<style>
+:root{color-scheme:dark;font:16px system-ui,sans-serif;background:#10171c;color:#e7eff4}body{max-width:1100px;margin:32px auto;padding:0 24px}h1{font-size:28px}p{color:#a7bac8;line-height:1.5}form{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:24px 0}label{display:grid;gap:8px;font-size:14px}input,button{font:inherit;padding:11px;border:1px solid #435865;border-radius:8px;background:#1d2a33;color:inherit}button{cursor:pointer}.primary{background:#b5edcf;color:#12251a;border-color:#b5edcf}button:disabled{opacity:.45;cursor:default}.screen{background:#080d10;border:1px solid #2d3e49;border-radius:12px;min-height:350px;display:grid;place-items:center;overflow:hidden}img{display:block;max-width:100%;max-height:76vh;width:auto;height:auto}img[hidden]{display:none}#placeholder{padding:24px;color:#8399a8}#stats{margin-top:16px;color:#a7bac8}#status{min-height:24px}
+</style>
+<h1>Fuse 1+ live camera</h1><p>Continuous live images from your printer, using a local streaming connection.</p>
+<form id="form"><label>Printer IP address or hostname<input id="host" value="printer.local" required></label><button class="primary" id="connect">Connect</button><button id="disconnect" type="button" disabled>Disconnect</button></form>
+<p id="status" role="status">Ready.</p><div class="screen"><span id="placeholder">The live image will appear here.</span><img id="image" alt="Live image from the Fuse printer camera" hidden></div><div id="stats">0 images received</div>
+<p style="font-size:13px">Images stream continuously. The helper runs only on this computer and connects directly to your printer.</p>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let session = null, poll = null, generation = 0;
+function stop(message = 'Disconnected.') {
+  generation++; session = null; clearInterval(poll); poll = null;
+  $('image').removeAttribute('src'); $('image').hidden = true; $('placeholder').hidden = false;
+  $('connect').disabled = false; $('host').disabled = false; $('disconnect').disabled = true; $('status').textContent = message;
+}
+$('form').addEventListener('submit', event => {
+  event.preventDefault(); const host = $('host').value.trim();
+  if (!/^[a-zA-Z0-9.-]{1,253}$/.test(host)) { $('status').textContent = 'Enter a printer IP address or hostname.'; return; }
+  stop('Connecting…'); const token = generation; session = crypto.randomUUID();
+  $('connect').disabled = true; $('host').disabled = true; $('disconnect').disabled = false;
+  $('image').src = `/stream?host=${encodeURIComponent(host)}&id=${session}`;
+  poll = setInterval(async () => {
+    const id = session; if (!id) return;
+    try {
+      const state = await (await fetch(`/stats?id=${id}`, {cache:'no-store'})).json();
+      if (token !== generation) return;
+      $('status').textContent = state.state;
+      $('stats').textContent = `${state.fps.toFixed(1)} FPS received · ${state.frames} images received`;
+      if (state.frames) { $('image').hidden = false; $('placeholder').hidden = true; }
+    } catch (_) { if (token === generation) stop('Local camera helper disconnected.'); }
+  }, 1000);
+});
+$('disconnect').addEventListener('click', () => stop());
+$('image').addEventListener('error', () => { if (session) stop('Camera stream disconnected. Reconnect to try again.'); });
+window.addEventListener('beforeunload', () => { clearInterval(poll); $('image').removeAttribute('src'); });
+</script></html>

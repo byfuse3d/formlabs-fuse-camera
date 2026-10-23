@@ -1,0 +1,10 @@
+services:
+  fuse-camera:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8766:8766"
+    environment:
+      FUSE_PRINTER_HOST: "${FUSE_PRINTER_HOST:?Set FUSE_PRINTER_HOST in .env}"
+      FUSE_PRINTER_PORT: "8084"
+      FUSE_MAX_FPS: "60"

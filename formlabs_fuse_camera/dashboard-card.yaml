@@ -1,0 +1,5 @@
+type: picture-entity
+entity: camera.fuse_1_built_in_camera
+name: Fuse 1+ Built-in Camera
+camera_view: live
+show_state: false

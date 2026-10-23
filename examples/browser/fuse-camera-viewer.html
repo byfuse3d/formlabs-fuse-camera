@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fuse 1+ camera</title>
+<style>
+  :root{color-scheme:dark;font:16px system-ui,sans-serif;background:#10171c;color:#e7eff4}
+  body{max-width:1100px;margin:40px auto;padding:0 24px}
+  h1{font-size:28px;margin-bottom:6px}p{color:#a7bac8;line-height:1.5}
+  form{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:28px 0}
+  label{display:grid;gap:8px;font-size:14px}input,select,button{font:inherit;border:1px solid #435865;border-radius:8px;padding:11px;background:#1d2a33;color:inherit}
+  input{width:240px}button{cursor:pointer}button.primary{background:#b5edcf;color:#12251a;border-color:#b5edcf}
+  button:disabled{opacity:.45;cursor:default}#status{min-height:28px}
+  .screen{background:#080d10;border:1px solid #2d3e49;border-radius:12px;min-height:420px;display:grid;place-items:center;overflow:hidden}
+  canvas{max-width:100%;max-height:70vh;width:auto;height:auto;display:block}canvas[hidden]{display:none}.screen span{color:#8399a8;padding:24px;text-align:center}
+  footer{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-top:16px;color:#a7bac8;font-size:14px}
+  a{color:#b5edcf}a[aria-disabled=true]{opacity:.4;pointer-events:none}
+</style>
+<h1>Fuse 1+ camera</h1>
+<p>Connect to your printer on the same network. This viewer uses the camera protocol recovered from PreForm 3.64.1.664.</p>
+<form id="connectForm">
+  <label>Printer IP address or hostname<input id="host" value="printer.local" placeholder="printer.local" required autocomplete="off" spellcheck="false"></label>
+  <label>Maximum frame rate<select id="rate"><option value="0" selected>Auto · fastest available</option><option value="5">5 FPS</option><option value="10">10 FPS</option><option value="15">15 FPS</option><option value="30">30 FPS</option><option value="60">60 FPS</option></select></label>
+  <button class="primary" id="connect">Connect</button>
+  <button type="button" id="disconnect" disabled>Disconnect</button>
+</form>
+<p id="status" role="status" aria-live="polite">Ready. No printer connection has been made.</p>
+<div class="screen"><span id="placeholder">The camera image will appear here.</span><canvas id="frame" role="img" aria-label="Live image from the Fuse printer camera" hidden></canvas></div>
+<footer><span id="stats">0 images received</span><a id="save" href="#" aria-disabled="true">Save current image</a></footer>
+<p style="font-size:13px">Auto requests each new image as soon as the previous reply arrives. Camera communication and image decoding run separately from the display. No cloud service is used.</p>
+<script id="cameraWorker" type="text/plain">
+'use strict';
+let socket, timer, watchdog, rate = 0, inFlight = false, lastRequest = 0;
+let decoding = false, newest = null, received = 0, times = [];
+function send(message, transfer = []) { self.postMessage(message, transfer); }
+function fail(message) {
+  clearTimeout(timer); clearTimeout(watchdog);
+  if (socket) { const old = socket; socket = null; old.close(); }
+  send({type:'error', message});
+}
+function request() {
+  clearTimeout(timer);
+  if (!socket || socket.readyState !== WebSocket.OPEN || inFlight) return;
+  const delay = rate ? Math.max(0, 1000 / rate - (performance.now() - lastRequest)) : 0;
+  if (delay > 1 || socket.bufferedAmount > 0) { timer = setTimeout(request, Math.max(2, delay)); return; }
+  inFlight = true; lastRequest = performance.now(); socket.send(' ');
+  clearTimeout(watchdog); watchdog = setTimeout(() => fail('The camera stopped replying. Reconnect to try again.'), 8000);
+}
+async function decodeLatest() {
+  if (decoding) return;
+  decoding = true;
+  try {
+    while (newest) {
+      const packet = newest; newest = null;
+      const bitmap = await createImageBitmap(new Blob([packet.jpeg], {type:'image/jpeg'}));
+      if (!socket) { bitmap.close(); break; }
+      if (newest) { bitmap.close(); continue; }
+      send({type:'frame', bitmap, jpeg:packet.jpeg, received, receivedFps:packet.fps}, [bitmap, packet.jpeg]);
+    }
+  } catch (_) { send({type:'notice', message:'A camera image could not be decoded.'}); }
+  finally { decoding = false; }
+}
+self.onmessage = event => {
+  const data = event.data;
+  if (data.type === 'rate') { rate = Number(data.rate); request(); return; }
+  if (data.type !== 'connect') return;
+  rate = Number(data.rate);
+  try { socket = new WebSocket(data.url); } catch (error) { fail(error.message); return; }
+  socket.binaryType = 'arraybuffer';
+  const current = socket;
+  watchdog = setTimeout(() => fail('Connection timed out. Check the printer address and network connection.'), 10000);
+  current.onopen = () => { if (socket !== current) return; clearTimeout(watchdog); send({type:'connected'}); request(); };
+  current.onmessage = event => {
+    if (socket !== current) return;
+    // The printer sends an initialization JSON message before the first JPEG.
+    // It is not the reply to our outstanding image request.
+    if (typeof event.data === 'string') return;
+    inFlight = false; clearTimeout(watchdog);
+    const jpeg = event.data, header = new Uint8Array(jpeg, 0, Math.min(jpeg.byteLength, 3));
+    if (header[0] !== 255 || header[1] !== 216 || header[2] !== 255) { fail('The camera returned an invalid JPEG image.'); return; }
+    const now = performance.now(); times.push(now); times = times.filter(t => t >= now - 3000); received++;
+    const fps = times.length > 1 && now > times[0] ? (times.length - 1) * 1000 / (now - times[0]) : 0;
+    newest = {jpeg, fps}; request(); decodeLatest();
+  };
+  current.onerror = () => { if (socket === current) fail('Could not connect. Check the printer address and network connection.'); };
+  current.onclose = () => { if (socket === current) fail('The printer closed the camera connection.'); };
+};
+
+</script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+let worker = null, workerURL = null, saveURL = null, latestJPEG = null, pending = null;
+let paintHandle = null, generation = 0, displayed = 0, displayTimes = [], lastStats = 0;
+const context = $('frame').getContext('2d', {alpha:false});
+function status(message) { $('status').textContent = message; }
+function stop(message = 'Disconnected.') {
+  generation++;
+  if (worker) worker.terminate(); worker = null;
+  if (workerURL) URL.revokeObjectURL(workerURL); workerURL = null;
+  if (paintHandle !== null) cancelAnimationFrame(paintHandle); paintHandle = null;
+  if (pending) pending.bitmap.close(); pending = null;
+  $('connect').disabled = false; $('disconnect').disabled = true; $('host').disabled = false; status(message);
+}
+function endpoint(input) {
+  const host = input.trim();
+  if (!host || /[\s/:?#@\\]/.test(host)) throw new Error('Enter only a printer IPv4 address or hostname.');
+  const url = new URL(`ws://${host}:8084/`);
+  if (url.port !== '8084' || url.hostname !== host.toLowerCase()) throw new Error('Enter a valid printer IPv4 address or hostname.');
+  return url.href;
+}
+function paint() {
+  paintHandle = null;
+  const packet = pending; pending = null;
+  if (!packet) return;
+  const canvas = $('frame'), bitmap = packet.bitmap;
+  if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) { canvas.width = bitmap.width; canvas.height = bitmap.height; }
+  context.drawImage(bitmap, 0, 0); bitmap.close(); latestJPEG = packet.jpeg;
+  canvas.hidden = false; $('placeholder').hidden = true; $('save').setAttribute('aria-disabled', 'false');
+  const now = performance.now(); displayed++; displayTimes.push(now); displayTimes = displayTimes.filter(t => t >= now - 3000);
+  const fps = displayTimes.length > 1 && now > displayTimes[0] ? ((displayTimes.length - 1) * 1000 / (now - displayTimes[0])).toFixed(1) : '…';
+  if (now - lastStats > 250 || displayed === 1) {
+    $('stats').textContent = `${fps} FPS displayed · ${packet.receivedFps ? packet.receivedFps.toFixed(1) : '…'} FPS received · ${packet.received} images received`;
+    lastStats = now;
+  }
+  status('Camera connected.');
+}
+$('connectForm').addEventListener('submit', event => {
+  event.preventDefault(); let url;
+  try { url = endpoint($('host').value); } catch (error) { status(error.message); return; }
+  stop('Connecting…'); const token = generation;
+  latestJPEG = null; displayed = 0; displayTimes = []; lastStats = 0;
+  if (saveURL) URL.revokeObjectURL(saveURL); saveURL = null;
+  $('frame').hidden = true; $('placeholder').hidden = false;
+  $('save').href = '#'; $('save').setAttribute('aria-disabled', 'true'); $('stats').textContent = '0 images received';
+  $('connect').disabled = true; $('disconnect').disabled = false; $('host').disabled = true;
+  try {
+    workerURL = URL.createObjectURL(new Blob([$('cameraWorker').textContent], {type:'text/javascript'})); worker = new Worker(workerURL);
+  } catch (error) { stop(`Could not start the camera viewer: ${error.message}`); return; }
+  worker.onmessage = event => {
+    const data = event.data;
+    if (token !== generation) { if (data.bitmap) data.bitmap.close(); return; }
+    if (data.type === 'error') { stop(data.message); return; }
+    if (data.type === 'notice') { status(data.message); return; }
+    if (data.type === 'connected') { status('Connected. Waiting for a camera image…'); return; }
+    if (data.type !== 'frame') return;
+    if (pending) pending.bitmap.close(); pending = data;
+    if (paintHandle === null) paintHandle = requestAnimationFrame(paint);
+  };
+  worker.onerror = () => stop('The camera worker stopped. Reconnect to try again.');
+  worker.postMessage({type:'connect', url, rate:Number($('rate').value)});
+});
+$('disconnect').addEventListener('click', () => stop());
+$('rate').addEventListener('change', () => { if (worker) worker.postMessage({type:'rate', rate:Number($('rate').value)}); });
+$('save').addEventListener('click', event => {
+  if (!latestJPEG) { event.preventDefault(); return; }
+  if (saveURL) URL.revokeObjectURL(saveURL);
+  saveURL = URL.createObjectURL(new Blob([latestJPEG], {type:'image/jpeg'})); $('save').href = saveURL; $('save').download = 'fuse-camera.jpg';
+});
+window.addEventListener('beforeunload', () => { stop(); if (saveURL) URL.revokeObjectURL(saveURL); });
+
+</script>
+</html>

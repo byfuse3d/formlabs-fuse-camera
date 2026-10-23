@@ -1,0 +1,24 @@
+name: Formlabs Fuse Camera
+version: "1.0.1"
+slug: formlabs_fuse_camera
+description: Live camera and snapshots from a Formlabs Fuse 1 or Fuse 1+ printer
+arch:
+  - amd64
+  - aarch64
+boot: auto
+init: false
+ports:
+  8766/tcp: 8766
+ports_description:
+  8766/tcp: Camera stream, snapshot, and preview
+webui: "http://[HOST]:[PORT:8766]/"
+options:
+  printer_host: "printer.local"
+  printer_port: 8084
+  max_fps: 60
+  idle_seconds: 15
+schema:
+  printer_host: str
+  printer_port: port
+  max_fps: int(1,60)
+  idle_seconds: int(1,300)

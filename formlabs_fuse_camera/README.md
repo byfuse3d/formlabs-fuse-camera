@@ -1,7 +1,9 @@
 # Home Assistant app
 
-1. Make this source available to your Home Assistant installation. This private repository requires authenticated Git access; alternatively, copy the `formlabs_fuse_camera` directory into Home Assistant's local apps directory using existing administrative access.
-2. Install **Formlabs Fuse Camera** from the app store and open its Configuration page.
+Camera integration by **[byfuse3d.com](https://byfuse3d.com/)**.
+
+1. Make this source available to your Home Assistant installation. Add `https://github.com/byfuse3d/formlabs-fuse-camera` in the app store repository settings; alternatively, copy the `formlabs_fuse_camera` directory into Home Assistant's local apps directory using existing administrative access.
+2. Install **Formlabs Fuse Camera by byfuse3d.com** from the app store and open its Configuration page.
 3. Set `printer_host` to the printer's local address or hostname. `printer.local` is a placeholder and may not resolve on your network.
 4. Keep `printer_port` at `8084`, `max_fps` at `60`, and `idle_seconds` at `15` unless you need to tune them.
 5. Start the app and enable **Start on boot**.

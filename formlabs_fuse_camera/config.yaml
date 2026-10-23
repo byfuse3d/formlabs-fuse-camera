@@ -1,7 +1,8 @@
-name: Formlabs Fuse Camera
-version: "1.0.1"
+name: Formlabs Fuse Camera by byfuse3d.com
+version: "1.0.2"
 slug: formlabs_fuse_camera
-description: Live camera and snapshots from a Formlabs Fuse 1 or Fuse 1+ printer
+description: Live Fuse 1 / Fuse 1+ camera integration by byfuse3d.com
+url: https://byfuse3d.com/
 arch:
   - amd64
   - aarch64

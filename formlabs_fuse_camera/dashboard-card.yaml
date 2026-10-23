@@ -1,5 +1,9 @@
-type: picture-entity
-entity: camera.fuse_1_built_in_camera
-name: Fuse 1+ Built-in Camera
-camera_view: live
-show_state: false
+type: vertical-stack
+cards:
+  - type: picture-entity
+    entity: camera.fuse_1_built_in_camera
+    name: Fuse 1+ Built-in Camera
+    camera_view: live
+    show_state: false
+  - type: markdown
+    content: Camera integration by **[byfuse3d.com](https://byfuse3d.com/)**

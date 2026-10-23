@@ -1,5 +1,7 @@
 # Formlabs Fuse Camera
 
+Camera integration by **[byfuse3d.com](https://byfuse3d.com/)**.
+
 Local camera streaming for Formlabs Fuse 1 and Fuse 1+ 30W printers, with a Home Assistant app and standalone viewers.
 
 The recommended relay connects directly to the printer's camera WebSocket and serves MJPEG video and JPEG snapshots. It runs on Home Assistant OS, in Docker, or with Python 3.10+. The runtime uses only the Python standard library.
@@ -8,7 +10,7 @@ The recommended relay connects directly to the printer's camera WebSocket and se
 
 The app source is in [`formlabs_fuse_camera/`](formlabs_fuse_camera/README.md). Configure `printer_host` with your printer's address or hostname. The checked-in value `printer.local` is a placeholder; it is not automatically discovered.
 
-This repository is private. Home Assistant's app store must have authenticated Git access to clone it. A normal GitHub URL alone does not grant access. Do not put personal access tokens in repository files or dashboard URLs. An already installed local app continues to run without GitHub access; publishing this source does not migrate that installation's repository.
+Add `https://github.com/byfuse3d/formlabs-fuse-camera` to the Home Assistant app store's repository settings, then install **Formlabs Fuse Camera by byfuse3d.com**. The dashboard example includes a website credit below the camera. An already installed app from another repository keeps its existing repository identity; publishing updates here does not automatically migrate that installation.
 
 ## Run with Python
 
